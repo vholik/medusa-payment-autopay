@@ -76,10 +76,6 @@ const projectConfig = {
   store_cors: STORE_CORS,
   database_url: DATABASE_URL,
   admin_cors: ADMIN_CORS,
-  // TODO: remove this lines
-  service_id: process.env.AUTOPAY_SERVICE_ID,
-  general_key: process.env.AUTOPAY_GENERAL_KEY,
-  autopay_url: process.env.AUTOPAY_URL,
   // Uncomment the following lines to enable REDIS
   // redis_url: REDIS_URL
 };

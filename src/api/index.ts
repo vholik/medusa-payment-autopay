@@ -6,8 +6,8 @@ export default (_, options) => {
   const app = Router();
 
   const storeCors = {
-    // origin: options.store_cors.split(","),
-    // credentials: true,
+    origin: options.store_cors.split(","),
+    credentials: true,
   };
 
   hooks(app);
