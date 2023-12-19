@@ -9,7 +9,11 @@ export default (app, options) => {
   app.use("/", route);
 
   route.options("/store/autopay/:id/gateways", cors(options.storeCors));
-  route.get("/store/autopay/:id/gateways", wrapHandler(gatewayList));
+  route.get(
+    "/store/autopay/:id/gateways",
+    cors(options.storeCors),
+    wrapHandler(gatewayList)
+  );
 
   return app;
 };
