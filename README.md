@@ -2,7 +2,7 @@
 
 Receive payments on your Medusa commerce application using Autopay.
 
-[Author website](https://rigby.pl/) | [Checkout implementation docs](https://docs.medusajs.com/modules/carts-and-checkout/storefront/implement-checkout-flow)
+[Guide article on Medium](https://medium.com/@vholik/setting-up-autopay-blue-media-payments-in-medusa-js-c0aeb6998a9f) | [Author website](https://rigby.pl/) | [Checkout implementation docs](https://docs.medusajs.com/modules/carts-and-checkout/storefront/implement-checkout-flow)
 
 ## Features
 
