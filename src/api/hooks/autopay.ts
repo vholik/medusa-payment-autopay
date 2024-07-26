@@ -5,10 +5,9 @@ import {
   PaymentSessionStatus,
 } from "@medusajs/medusa";
 import { parseXml } from "../../utils/xml";
-import AutopayPaymentProcessor, {
-  AutopayPaymentSessionStatusMap,
-} from "../../services/autopay-payment-processor";
+import AutopayPaymentProcessor from "../../services/autopay-payment-processor";
 import { Logger } from "@tanstack/react-query";
+import { AutopayPaymentSessionStatusMap } from "../../types";
 
 export default async (req: MedusaRequest, res: MedusaResponse) => {
   const autopayPaymentProcessor = req.scope.resolve(
@@ -38,13 +37,17 @@ export default async (req: MedusaRequest, res: MedusaResponse) => {
             orderID.content
           );
 
-          const verify = await autopayPaymentProcessor.verifyWebhookHash(
-            orderID.content,
-            hash.content
-          );
+          const verify = autopayPaymentProcessor.verifyWebhookHash({
+            cartId: orderID.content,
+            currency: capturedOrder.currency_code.toUpperCase(),
+            hash: hash.content,
+            total: capturedOrder.total,
+          });
 
           if (verify) {
-            await orderService.capturePayment(capturedOrder.id);
+            await orderService
+              .withTransaction(transactionManager)
+              .capturePayment(capturedOrder.id);
           } else {
             logger.error(
               "Error verifying Autopay webhook hash on cart id " +

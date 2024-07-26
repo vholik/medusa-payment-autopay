@@ -42,16 +42,16 @@ const plugins = [
   //     upload_dir: "uploads",
   //   },
   // },
-  // {
-  //   resolve: "@medusajs/admin",
-  //   /** @type {import('@medusajs/admin').PluginOptions} */
-  //   options: {
-  //     autoRebuild: true,
-  //     develop: {
-  //       open: false,
-  //     },
-  //   },
-  // },
+  {
+    resolve: "@medusajs/admin",
+    /** @type {import('@medusajs/admin').PluginOptions} */
+    options: {
+      autoRebuild: true,
+      develop: {
+        open: false,
+      },
+    },
+  },
 ];
 
 const modules = {

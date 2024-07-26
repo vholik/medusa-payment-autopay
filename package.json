@@ -1,6 +1,6 @@
 {
   "name": "medusa-payment-autopay",
-  "version": "0.0.1",
+  "version": "0.0.2-alpha.3",
   "description": "Medusa Autopay payment provider",
   "author": "Rigby (https://rigby.pl)",
   "license": "MIT",

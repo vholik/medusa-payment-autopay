@@ -8,9 +8,9 @@ const route = Router();
 export default (app, options) => {
   app.use("/", route);
 
-  route.options("/store/autopay/:id/gateways", cors(options.storeCors));
+  route.options("/store/autopay/gateways", cors(options.storeCors));
   route.get(
-    "/store/autopay/:id/gateways",
+    "/store/autopay/gateways",
     cors(options.storeCors),
     wrapHandler(gatewayList)
   );

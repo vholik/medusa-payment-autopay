@@ -1,8 +1,6 @@
 import {
   AbstractPaymentProcessor,
-  CartService,
   Logger,
-  OrderService,
   PaymentProcessorContext,
   PaymentProcessorError,
   PaymentProcessorSessionResponse,
@@ -12,52 +10,19 @@ import { generateUniqueID, hashStringWithSHA256 } from "../utils/hash";
 import { convertToDecimalString } from "../utils/price";
 import buildApi from "../utils/api";
 import { parseXml } from "../utils/xml";
+import {
+  AutopayConfig,
+  AutopayPaymentSessionStatusMap,
+  GatewayListResponse,
+  InitiatePaymentResponse,
+} from "../types";
 
-type InitiatePaymentResponse = {
-  orderID: { content: string };
-  transaction: {
-    status: { content: "PENDING" };
-    redirecturl: { content: string };
-    reason: { content: string };
-  };
-};
-
-type Settings = {
-  general_key: string;
-  service_id: string;
-  autopay_url: string;
-};
-
-type GatewayListResponse = {
-  gatewayList: [
-    {
-      gatewayID: number;
-      gatewayName: string;
-      gatewayType: string;
-      bankName: string;
-      iconURL: string;
-      state: string;
-      stateDate: string;
-      gatewayDescription: null | string;
-      inBalanceAllowed: boolean;
-      currencyList: { currency: string }[];
-    }
-  ];
-};
-
-export const AutopayPaymentSessionStatusMap = {
-  SUCCESS: PaymentSessionStatus.AUTHORIZED,
-  PENDING: PaymentSessionStatus.PENDING,
-  FAILURE: PaymentSessionStatus.CANCELED,
-};
-
-class AutopayPaymentProcessor extends AbstractPaymentProcessor {
+abstract class AutopayBase extends AbstractPaymentProcessor {
   static identifier = "autopay";
+
   protected readonly logger: Logger;
-  protected readonly cartService: CartService;
   protected readonly $api: ReturnType<typeof buildApi>;
-  protected readonly orderService: OrderService;
-  private readonly settings_: Settings;
+  private readonly settings_: AutopayConfig;
 
   constructor(container, settings) {
     super(container);
@@ -72,8 +37,6 @@ class AutopayPaymentProcessor extends AbstractPaymentProcessor {
      */
     this.settings_ = settings;
     this.logger = container.logger;
-    this.cartService = container.cartService;
-    this.orderService = container.orderService;
     this.$api = buildApi(settings.autopay_url);
   }
 
@@ -99,29 +62,24 @@ class AutopayPaymentProcessor extends AbstractPaymentProcessor {
     };
   }
 
-  async getCartCurrency(cartId: string) {
-    const cart = await this.cartService.retrieveWithTotals(cartId);
-
-    return cart.region.currency_code.toUpperCase();
-  }
-
   async cancelPayment(
     paymentSessionData: Record<string, unknown>
   ): Promise<Record<string, unknown> | PaymentProcessorError> {
     return paymentSessionData;
   }
 
-  private async generateAutopayParameters({
+  private generateAutopayParameters({
     cartId,
     gatewayId,
     total,
+    currency,
   }: {
     cartId: string;
     gatewayId?: number;
     total: number;
+    currency: string;
   }) {
     const decimalTotal = convertToDecimalString(total);
-    const currency = await this.getCartCurrency(cartId);
 
     const hashContent = gatewayId
       ? `${this.settings_.service_id}|${cartId}|${decimalTotal}|${gatewayId}|${currency}|${this.settings_.general_key}`
@@ -136,43 +94,31 @@ class AutopayPaymentProcessor extends AbstractPaymentProcessor {
     return { hash, apiUrl };
   }
 
-  async verifyWebhookHash(cartId: string, hash: string) {
-    const cart = await this.cartService.retrieveWithTotals(cartId);
-    const gatewayId = cart.context?.gateway_id as number | undefined;
-
-    const { hash: generatedHash } = await this.generateAutopayParameters({
+  verifyWebhookHash({
+    cartId,
+    hash,
+    currency,
+    total,
+    gatewayId,
+  }: {
+    cartId: string;
+    hash: string;
+    total: number;
+    currency: string;
+    gatewayId?: number;
+  }) {
+    const { hash: generatedHash } = this.generateAutopayParameters({
       cartId,
-      gatewayId,
-      total: cart.total,
+      gatewayId: gatewayId,
+      total: total,
+      currency,
     });
 
     return generatedHash === hash;
   }
 
-  async sendInitialPaymentData({
-    cartId,
-    gatewayId,
-    total,
-  }: {
-    cartId: string;
-    total: number;
-    gatewayId?: number;
-  }) {
-    const { apiUrl } = await this.generateAutopayParameters({
-      cartId,
-      gatewayId,
-      total,
-    });
-
-    const data = await this.$api<string>(apiUrl);
-
-    return parseXml<InitiatePaymentResponse>(data);
-  }
-
-  async listGateway(cartId: string) {
+  async listGateway(currency: string) {
     const id = generateUniqueID();
-
-    const currency = await this.getCartCurrency(cartId);
 
     const hash = hashStringWithSHA256(
       `${this.settings_.service_id}|${id}|${currency}|${this.settings_.general_key}`
@@ -188,18 +134,45 @@ class AutopayPaymentProcessor extends AbstractPaymentProcessor {
     return data.gatewayList;
   }
 
+  async sendInitialPaymentData({
+    cartId,
+    gatewayId,
+    total,
+    currency,
+  }: {
+    cartId: string;
+    total: number;
+    gatewayId?: number;
+    currency: string;
+  }) {
+    const { apiUrl } = this.generateAutopayParameters({
+      cartId,
+      gatewayId,
+      total,
+      currency,
+    });
+
+    const data = await this.$api<string>(apiUrl);
+
+    return parseXml<InitiatePaymentResponse>(data);
+  }
+
   async initiatePayment(
     context: PaymentProcessorContext
   ): Promise<PaymentProcessorError | PaymentProcessorSessionResponse> {
-    const cart = await this.cartService.retrieve(context.resource_id);
-
-    const gatewayId = cart.context?.gateway_id as number | undefined;
+    const {
+      currency_code,
+      amount,
+      resource_id,
+      context: cart_context,
+    } = context;
 
     try {
       const autopayResponse = await this.sendInitialPaymentData({
-        cartId: context.resource_id,
-        gatewayId,
-        total: context.amount,
+        cartId: resource_id,
+        gatewayId: cart_context.gateway_id as number | undefined,
+        total: amount,
+        currency: currency_code.toUpperCase(),
       });
 
       const paymentStatus =
@@ -215,7 +188,7 @@ class AutopayPaymentProcessor extends AbstractPaymentProcessor {
         const session_data = {
           status: paymentStatus,
           redirect_url: autopayResponse.transaction.redirecturl.content,
-          gateway_id: gatewayId ?? null,
+          gateway_id: (cart_context.gateway_id as number | undefined) ?? null,
         };
 
         return {
@@ -250,18 +223,18 @@ class AutopayPaymentProcessor extends AbstractPaymentProcessor {
     );
 
     return `
-    <?xml version="1.0" encoding="UTF-8"?>
-        <confirmationList>
-      <serviceID>${this.settings_.service_id}</serviceID>
-      <transactionsConfirmations>
-        <transactionConfirmed>
-          <orderID>${cartId}</orderID>
-          <confirmation>${confirmation}</confirmation>
-        </transactionConfirmed>
-      </transactionsConfirmations>
-      <hash>${hash}</hash>
-	  </confirmationList>
-    `;
+      <?xml version="1.0" encoding="UTF-8"?>
+          <confirmationList>
+        <serviceID>${this.settings_.service_id}</serviceID>
+        <transactionsConfirmations>
+          <transactionConfirmed>
+            <orderID>${cartId}</orderID>
+            <confirmation>${confirmation}</confirmation>
+          </transactionConfirmed>
+        </transactionsConfirmations>
+        <hash>${hash}</hash>
+        </confirmationList>
+      `;
   }
 
   async getPaymentStatus(
@@ -294,9 +267,18 @@ class AutopayPaymentProcessor extends AbstractPaymentProcessor {
   ): Promise<Record<string, unknown> | PaymentProcessorError> {
     return paymentSessionData;
   }
+
   async updatePayment(
     context: PaymentProcessorContext
-  ): Promise<void | PaymentProcessorError | PaymentProcessorSessionResponse> {}
+  ): Promise<void | PaymentProcessorError | PaymentProcessorSessionResponse> {
+    const { amount, paymentSessionData } = context;
+
+    if (amount && paymentSessionData.amount === Math.round(amount)) {
+      return;
+    }
+
+    return await this.initiatePayment(context);
+  }
 
   async updatePaymentData(
     sessionId: string,
@@ -306,4 +288,4 @@ class AutopayPaymentProcessor extends AbstractPaymentProcessor {
   }
 }
 
-export default AutopayPaymentProcessor;
+export default AutopayBase;
