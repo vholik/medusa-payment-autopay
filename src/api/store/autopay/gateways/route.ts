@@ -1,8 +1,8 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/medusa";
-import { DEFAULT_CURRENCY } from "../../types";
-import AutopayBase from "../../services/autopay-payment-processor";
+import { DEFAULT_CURRENCY } from "../../../../types";
+import AutopayBase from "../../../../services/autopay-payment-processor";
 
-export default async (req: MedusaRequest, res: MedusaResponse) => {
+export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const paymentProvider = req.scope.resolve(
     "autopayPaymentProcessorService"
   ) as AutopayBase;

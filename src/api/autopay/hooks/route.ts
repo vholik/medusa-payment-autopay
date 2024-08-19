@@ -4,12 +4,12 @@ import {
   OrderService,
   PaymentSessionStatus,
 } from "@medusajs/medusa";
-import { parseXml } from "../../utils/xml";
-import AutopayPaymentProcessor from "../../services/autopay-payment-processor";
+import { parseXml } from "../../../utils/xml";
+import AutopayPaymentProcessor from "../../../services/autopay-payment-processor";
 import { Logger } from "@tanstack/react-query";
-import { AutopayPaymentSessionStatusMap } from "../../types";
+import { AutopayPaymentSessionStatusMap } from "../../../types";
 
-export default async (req: MedusaRequest, res: MedusaResponse) => {
+export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const autopayPaymentProcessor = req.scope.resolve(
     "autopayPaymentProcessorService"
   ) as AutopayPaymentProcessor;
@@ -17,7 +17,9 @@ export default async (req: MedusaRequest, res: MedusaResponse) => {
   const logger = req.scope.resolve("logger") as Logger;
   const manager = req.scope.resolve("manager");
 
-  const xmlString = Buffer.from(req.body).toString();
+  const xmlString = Buffer.from(req.body.transactions, "base64").toString(
+    "utf-8"
+  );
 
   const {
     transactions: {
