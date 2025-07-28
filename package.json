@@ -24,7 +24,7 @@
     "prepare": "cross-env NODE_ENV=production npm run build:server && medusa-admin bundle"
   },
   "dependencies": {
-    "express-xml-bodyparser": "^0.3.0",
+    "express-xml-bodyparser": "^0.4.1",
     "xml-js": "^1.6.11"
   },
   "peerDependencies": {
